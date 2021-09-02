@@ -1,3 +1,7 @@
+using FluentValidation.AspNetCore;
+using LightweightArchitectureWebApi.Behaviors;
+using LightweightArchitectureWebApi.Repositories;
+using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -10,6 +14,7 @@ using Microsoft.OpenApi.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace LightweightArchitectureWebApi
@@ -27,11 +32,33 @@ namespace LightweightArchitectureWebApi
         public void ConfigureServices(IServiceCollection services)
         {
 
-            services.AddControllers();
+            services.AddControllers()
+                // validation in controllers
+                .AddFluentValidation(fv => fv.RegisterValidatorsFromAssembly(Assembly.GetExecutingAssembly()));
+            
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "LightweightArchitectureWebApi", Version = "v1" });
             });
+
+            services.AddMediatR(AppDomain.CurrentDomain.GetAssemblies());
+            // building mediator pipeline
+            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+
+            services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
+            // manual registration
+            //services.AddTransient<IOrderRepository, OrderRepository>();
+
+            // with assembly scanning (with Scrutor)
+            services.Scan(scan => scan
+                 .FromCallingAssembly()
+                     .AddClasses(classes => classes.InNamespaces("LightweightArchitectureWebApi.Repositories"))
+                         .AsImplementedInterfaces()
+                         .WithTransientLifetime());
+
+
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
